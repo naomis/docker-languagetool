@@ -1,10 +1,16 @@
 # syntax=docker/dockerfile:1
 ARG LANGUAGETOOL_VERSION=6.8
 ARG TARGETARCH
+# Définition de la variable pour la locale (fr_FR.UTF-8 par défaut)
+ARG DEFAULT_LANG=fr_FR.UTF-8
 
 FROM debian:bookworm AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+# Récupération de l'argument de locale pour l'environnement de build
+ARG DEFAULT_LANG
+ENV LANG=${DEFAULT_LANG}
 
 # Install common packages
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -20,22 +26,23 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         unzip \
         xmlstarlet
 
-# Install ARM64-specific packages (cached separately)
-RUN [ "$TARGETARCH" = "arm64" ] && \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+# Install ARM64-specific packages (Correction de la syntaxe de la monture cache)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get install -y --no-install-recommends \
-        build-essential \
-        cmake \
-        mercurial \
-        texlive \
-        wget \
-        zip || true
+    if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get install -y --no-install-recommends \
+            build-essential \
+            cmake \
+            mercurial \
+            texlive \
+            wget \
+            zip; \
+    fi
 
-RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+# Génération dynamique de la locale choisie
+RUN sed -i -e "s/# ${LANG} ${LANG##*.}/${LANG} ${LANG##*.}/" /etc/locale.gen && \
     dpkg-reconfigure --frontend=noninteractive locales && \
-    update-locale LANG=en_US.UTF-8
-ENV LANG=en_US.UTF-8
+    update-locale LANG=${LANG}
 
 ARG LANGUAGETOOL_VERSION
 RUN git clone https://github.com/languagetool-org/languagetool.git --depth 1 -b v${LANGUAGETOOL_VERSION}
@@ -66,6 +73,9 @@ WORKDIR /languagetool
 FROM alpine:3.24.0
 
 ARG TARGETARCH
+# Récupération de la locale pour le stage final (Alpine)
+ARG DEFAULT_LANG
+ENV LANG=${DEFAULT_LANG}
 
 RUN apk add --no-cache \
     bash \
@@ -84,8 +94,8 @@ RUN addgroup -S languagetool && adduser -S languagetool -G languagetool
 COPY --chown=languagetool:languagetool --from=build /dist/LanguageTool /LanguageTool
 
 RUN if [ "$TARGETARCH" = "arm64" ]; then \
-    echo "Applying ARM64 workaround for Hunspell..."; \
-    HUNSPELL_SRC=$(find /usr/lib -name 'libhunspell-*.so*' -type f | head -n 1); \
+        echo "Applying ARM64 workaround for Hunspell..."; \
+        HUNSPELL_SRC=$(find /usr/lib -name 'libhunspell-*.so*' -type f | head -n 1); \
         if [ -z "$HUNSPELL_SRC" ]; then \
             echo "Unable to locate hunspell shared library in /usr/lib"; \
             exit 1; \
@@ -111,10 +121,16 @@ RUN set -eux; \
     echo "fasttextBinary=$(command -v fasttext)" >> config.properties; \
     chown languagetool:languagetool config.properties
 
+RUN install -d -m 755 /dict && chown languagetool:languagetool /dict
+
+COPY --chown=languagetool:languagetool docker-entrypoint.sh docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
+
 USER languagetool
 
 HEALTHCHECK --timeout=10s --start-period=5s CMD curl --fail --data "language=en-US&text=a simple test" http://localhost:8010/v2/check || exit 1
 
-CMD ["bash", "start.sh"]
+ENTRYPOINT ["/bin/bash", "docker-entrypoint.sh"]
+CMD ["/bin/bash", "start.sh"]
 
 EXPOSE 8010
