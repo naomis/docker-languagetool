@@ -32,9 +32,10 @@ inject_dict() {
 
 # --- Français ---
 if [ -d "$FR_HUNSPELL" ]; then
-    inject_dict /dict/keran_spellings_fr.txt   "${FR_HUNSPELL}/spelling.txt"  "fr/spelling"
-    inject_dict /dict/keran_ignore_fr.txt      "${FR_HUNSPELL}/ignore.txt"    "fr/ignore"
-    inject_dict /dict/keran_prohibited_fr.txt  "${FR_HUNSPELL}/prohibit.txt"  "fr/prohibited"
+    inject_dict /dict/keran_spellings_fr.txt    "${FR_HUNSPELL}/spelling.txt"   "fr/spelling"
+    inject_dict /dict/sce_spellings_fr.txt      "${FR_HUNSPELL}/spelling.txt"   "fr/spelling"
+    inject_dict /dict/keran_ignore_fr.txt       "${FR_HUNSPELL}/ignore.txt"     "fr/ignore"
+    inject_dict /dict/keran_prohibited_fr.txt   "${FR_HUNSPELL}/prohibit.txt"   "fr/prohibited"
 else
     echo "[entrypoint] AVERTISSEMENT : répertoire hunspell FR introuvable (${FR_HUNSPELL})"
 fi

@@ -11,11 +11,11 @@ services:
     restart: unless-stopped
     ports:
       - 8010:8010
+    env_file:
+      - langtool.env
     environment:
-      - langtool_languageModel=/ngrams
-      - langtool_motherTongue=fr
-      - Java_Xms=512m
-      - Java_Xmx=1g
+      - Java_Xms=1g
+      - Java_Xmx=2g
     volumes:
       - ./data/ngrams:/ngrams:ro
       - ./data/dict:/dict/:ro
